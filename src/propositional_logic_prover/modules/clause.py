@@ -1,8 +1,7 @@
 from modules import cnf_converter
-from modules.literal import Literal
 from modules.parser import WFF
 
-type Clause = frozenset[Literal]
+type Clause = frozenset[str]
 
 
 def convert_to_clauses(wff: WFF) -> set[Clause]:
