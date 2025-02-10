@@ -3,25 +3,24 @@ from anytree.exporter import UniqueDotExporter
 from modules.clause import Clause
 
 
-class DerivationBuilder:
-    def __init__(
-        self, derivation_map: dict[Clause, tuple[Clause, Clause]]
-    ) -> None:
-        self._derivation_map: dict[Clause, tuple[Clause, Clause]] = (
-            derivation_map
-        )
+def build_derivation_tree(
+    derivation: dict[Clause, tuple[Clause, Clause]]
+) -> Node:
+    root = Node("")
+    nodes: list[Node] = [root]
+    clauses: list[Clause] = [frozenset()]
+    while clauses != []:
+        node = nodes.pop()
+        clause = clauses.pop()
+        node.name = clause_to_str(clause)
+        if clause not in derivation.keys():
+            continue
 
-    def create_node(self, clause: Clause) -> Node:
-        if clause in self._derivation_map.keys():
-            clause1, clause2 = self._derivation_map[clause]
-            node_lhs = self.create_node(clause1)
-            node_rhs = self.create_node(clause2)
-            return Node(clause_to_str(clause), children=[node_lhs, node_rhs])
-
-        return Node(clause_to_str(clause))
-
-    def build(self) -> Node:
-        return self.create_node(frozenset())
+        node.children = [Node(""), Node("")]
+        nodes.extend(node.children)
+        pair = derivation[clause]
+        clauses.extend(pair)
+    return root
 
 
 def clause_to_str(clause: Clause) -> str:
@@ -31,15 +30,15 @@ def clause_to_str(clause: Clause) -> str:
     return "□"
 
 
-def show_derivation(node: Node) -> None:
-    for pre, _, node in RenderTree(node):
+def show_derivation(root: Node) -> None:
+    for pre, _, node in RenderTree(root):
         print("%s%s" % (pre, node.name))
 
 
-def save_derivation_png(node: Node, path: str) -> None:
+def save_derivation_png(root: Node, path: str) -> None:
     # Turn graph bottom up and redirect edges back to parent
     UniqueDotExporter(
-        node,
+        root,
         options=[
             'rankdir="BT"',
             'edge [dir="back"]',
