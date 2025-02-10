@@ -5,65 +5,80 @@ from modules.literal import negate_literal
 from modules.parser import WFF, Negation
 
 
-class Prover:
-    def __init__(self) -> None:
-        self.initial_clauses: set[Clause] = set()
-        self.derivation_map: dict[Clause, tuple[Clause, Clause]] = dict()
-        self.resolved: set[tuple[Clause, Clause]] = set()
+def prove_by_refutation(
+    kb: WFF, query: WFF
+) -> tuple[bool, dict[Clause, tuple[Clause, Clause]]]:
+    clauses = convert_to_clauses(kb)
+    query_negated = Negation(None, query)
+    clauses_query = convert_to_clauses(query_negated)
+    initial_clauses = clauses.union(clauses_query)
+    derivation = search_refutation(initial_clauses)
+    return frozenset() in derivation.keys(), derivation
 
-    def add_to_derivation(
-        self, resolvent: Clause, clause_tuple: tuple[Clause, Clause]
-    ) -> None:
-        # Check to avoid self derivation loops
-        if resolvent in self.derivation_map.keys():
-            return
 
-        # Check to avoid derivation of initial clauses
-        if resolvent in self.initial_clauses:
-            return
+def verify_knowledge_base_consistency(kb: WFF) -> bool:
+    clauses = convert_to_clauses(kb)
+    derivation = search_refutation(clauses)
+    return not frozenset() in derivation.keys()
 
-        self.derivation_map[resolvent] = clause_tuple
 
-    def resolve(self, clause1: Clause, clause2: Clause) -> set[Clause]:
-        resolvents: set[Clause] = set()
-        for literal in clause1:
-            neg_literal = negate_literal(literal)
-            if neg_literal in clause2:
-                clause_diff1 = clause1.difference({literal})
-                clause_diff2 = clause2.difference({neg_literal})
-                resolvent = clause_diff1.union(clause_diff2)
-                resolvents.add(resolvent)
-                self.add_to_derivation(resolvent, (clause1, clause2))
-        return resolvents
+def search_refutation(
+    initial_clauses: set[Clause],
+) -> dict[Clause, tuple[Clause, Clause]]:
+    clauses = initial_clauses
+    resolved: set[tuple[Clause, Clause]] = set()
+    derivation: dict[Clause, tuple[Clause, Clause]] = dict()
+    clauses_to_filter = initial_clauses
+    length = 0
+    while length != len(clauses):
+        if frozenset() in clauses:
+            break
 
-    def resolve_all(self, clauses: set[Clause]) -> set[Clause]:
-        resolvents: set[Clause] = set()
-        for clause_tuple in combinations(clauses, 2):
-            if clause_tuple in self.resolved:
-                continue
-            self.resolved.add(clause_tuple)
-            resolvents = resolvents.union(self.resolve(*clause_tuple))
-            if frozenset() in resolvents:
-                break
-        return resolvents
+        length = len(clauses)
+        pairs = [
+            pair for pair in combinations(clauses, 2) if pair not in resolved
+        ]
+        pairs_resolvents = resolve_clause_pairs(pairs)
+        clauses = clauses.union(*pairs_resolvents)
+        derivation.update(
+            map_resolvent_to_parent(pairs_resolvents, pairs, clauses_to_filter)
+        )
+        clauses_to_filter = clauses_to_filter.union(*pairs_resolvents)
+    return derivation
 
-    def search_refutation(self, clauses: set[Clause]) -> bool:
-        length = 0
-        while length != len(clauses):
-            if frozenset() in clauses:
-                return True
 
-            length = len(clauses)
-            clauses = clauses.union(self.resolve_all(clauses))
-        return False
+def map_resolvent_to_parent(
+    pairs_resolvents: list[set[Clause]],
+    pairs: list[tuple[Clause, Clause]],
+    clauses_to_filter: set[Clause],
+) -> dict[Clause, tuple[Clause, Clause]]:
+    return {
+        resolvent: pair
+        for resolvents, pair in zip(pairs_resolvents, pairs)
+        for resolvent in resolvents
+        if not resolvent in clauses_to_filter
+    }
 
-    def prove_by_refutation(self, kb: WFF, query: WFF) -> bool:
-        clauses = convert_to_clauses(kb)
-        is_kb_unsatisfiable = self.search_refutation(clauses)
-        if is_kb_unsatisfiable:
-            raise ValueError("Knowledge base must be consistent")
 
-        query_negated = Negation(None, query)
-        clauses_query = convert_to_clauses(query_negated)
-        self.initial_clauses = clauses.union(clauses_query)
-        return self.search_refutation(self.initial_clauses)
+def resolve_clause_pairs(
+    pairs: list[tuple[Clause, Clause]]
+) -> list[set[Clause]]:
+    resolvents_list: list[set[Clause]] = []
+    for pair in pairs:
+        resolvents = resolve(*pair)
+        resolvents_list.append(resolvents)
+        if frozenset() in resolvents:
+            break
+    return resolvents_list
+
+
+def resolve(clause1: Clause, clause2: Clause) -> set[Clause]:
+    resolvents: set[Clause] = set()
+    for literal in clause1:
+        neg_literal = negate_literal(literal)
+        if neg_literal in clause2:
+            clause_diff1 = clause1.difference({literal})
+            clause_diff2 = clause2.difference({neg_literal})
+            resolvent = clause_diff1.union(clause_diff2)
+            resolvents.add(resolvent)
+    return resolvents
