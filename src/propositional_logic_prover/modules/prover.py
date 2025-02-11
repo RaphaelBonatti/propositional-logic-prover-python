@@ -28,7 +28,6 @@ def search_refutation(
     clauses = initial_clauses
     resolved: set[tuple[Clause, Clause]] = set()
     derivation: dict[Clause, tuple[Clause, Clause]] = dict()
-    clauses_to_filter = initial_clauses
     length = 0
     while length != len(clauses):
         if frozenset() in clauses:
@@ -38,12 +37,12 @@ def search_refutation(
         pairs = [
             pair for pair in combinations(clauses, 2) if pair not in resolved
         ]
+        resolved = resolved.union(pairs)
         pairs_resolvents = resolve_clause_pairs(pairs)
-        clauses = clauses.union(*pairs_resolvents)
         derivation.update(
-            map_resolvent_to_parent(pairs_resolvents, pairs, clauses_to_filter)
+            map_resolvent_to_parent(pairs_resolvents, pairs, clauses)
         )
-        clauses_to_filter = clauses_to_filter.union(*pairs_resolvents)
+        clauses = clauses.union(*pairs_resolvents)
     return derivation
 
 
