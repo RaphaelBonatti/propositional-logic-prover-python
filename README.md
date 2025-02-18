@@ -1,5 +1,5 @@
 # propositional-logic-prover-python
-The goal of this project is to develop a propositional logic prover based on the resolution refutation algorithm. This tool can be used for many applications, including automated reasoning
+The goal of this project is to develop a propositional logic prover based on the resolution refutation algorithm. This tool can be used for many applications, including automated reasoning.
 
 Main features:
 - Prover:
